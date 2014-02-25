@@ -86,6 +86,7 @@ struct himax_ts_data {
 #ifdef HIMAX_S2W
 	int s2w_touched;
 	int s2w_x_pos;
+	int s2w_activated;
 #endif
 };
 static struct himax_ts_data *private_ts;
@@ -1088,6 +1089,7 @@ EXPORT_SYMBOL(himax_s2w_setinp);
 
 void himax_s2w_release() {
 	private_ts->s2w_touched = 0;
+	private_ts->s2w_activated = 0;
 	printk(KERN_INFO "[TS][S2W]%s: Sweep2Wake Released", __func__);
 }
 
@@ -1111,15 +1113,11 @@ void himax_s2w_func(int x) {
 	//printk(KERN_INFO "[TS][S2W]%s: %d", __func__, x);
 	if (!himax_s2w_status()) {
 		private_ts->s2w_touched = 1;
+		private_ts->s2w_activated = 0;
 		private_ts->s2w_x_pos = x;
 	} else {
-		if (x < private_ts->s2w_x_pos) {
-			if ((private_ts->s2w_x_pos - x) > 650)
-				himax_s2w_power(&himax_s2w_power_work);
-		} else {
-			if ((x - private_ts->s2w_x_pos) > 650)
-				himax_s2w_power(&himax_s2w_power_work);
-		}
+		if (abs(private_ts->s2w_x_pos - x) > 680)
+			private_ts->s2w_activated = 1;
 	}
 }
 #endif
@@ -1353,7 +1351,11 @@ inline void himax_ts_work(struct himax_ts_data *ts)
 #ifdef HIMAX_S2W
 		if (s2w_switch) {
 			if (himax_s2w_status())
+			{
+				if (private_ts->s2w_activated == 1)
+					himax_s2w_power(&himax_s2w_power_work);	
 				himax_s2w_release();
+			}
 		}
 #endif
 	} else {
