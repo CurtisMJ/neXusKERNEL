@@ -87,6 +87,7 @@ struct himax_ts_data {
 	int s2w_touched;
 	int s2w_x_pos;
 	int s2w_activated;
+	int s2l_activated;
 #endif
 };
 static struct himax_ts_data *private_ts;
@@ -1116,8 +1117,16 @@ void himax_s2w_func(int x) {
 		private_ts->s2w_activated = 0;
 		private_ts->s2w_x_pos = x;
 	} else {
-		if (abs(private_ts->s2w_x_pos - x) > 680)
+		if ((abs(private_ts->s2w_x_pos - x) > 680) && (private_ts->suspend_mode == 1))
 			private_ts->s2w_activated = 1;
+		else if ((abs(private_ts->s2w_x_pos - x) > 680) && (private_ts->suspend_mode == 0))
+		{
+			// toggle soft key lock
+			if (private_ts->s2l_activated == 0)
+				private_ts->s2l_activated = 1;
+			else
+				private_ts->s2l_activated = 0; 
+		}
 	}
 }
 #endif
@@ -1305,7 +1314,6 @@ inline void himax_ts_work(struct himax_ts_data *ts)
 			}
 		}
 	}
-
 	if (buf[20] == 0xFF && buf[21] == 0xFF) {
 		
 		finger_on = 0;
@@ -1380,6 +1388,7 @@ inline void himax_ts_work(struct himax_ts_data *ts)
 							himax_s2w_release();
 					}
 				}
+				if ((private_ts->s2l_activated == 0) || (y < ts->pdata->abs_y_max)) {
 #endif
 
 				if (ts->event_htc_enable_type) {
@@ -1432,6 +1441,10 @@ inline void himax_ts_work(struct himax_ts_data *ts)
 				if (ts->debug_log_level & 0x2)
 					printk(KERN_INFO "[TP]Finger %d=> X:%d, Y:%d w:%d, z:%d, F:%d\n",
 						loop_i + 1, x, y, w, w, loop_i + 1);
+#ifdef HIMAX_S2W
+				}
+#endif
+
 			} else {
 				if (ts->protocol_type == PROTOCOL_TYPE_B) {
 					input_mt_slot(ts->input_dev, loop_i);
