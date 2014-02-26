@@ -1913,6 +1913,7 @@ static int himax8526a_resume(struct i2c_client *client)
 	ts->s2w_touched = 0;
 	if (!s2w_switch) {
 #endif
+	printk(KERN_INFO "[TS]%s: Flag for screen resume\n", __func__);
 	ts->just_resume = 1;
 
 	enable_irq(client->irq);
