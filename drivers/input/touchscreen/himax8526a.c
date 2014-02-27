@@ -1108,6 +1108,30 @@ static ssize_t himax_s2l_set(struct device *dev,
 static DEVICE_ATTR(s2lswitch, (S_IWUSR|S_IRUGO),
 	himax_s2l_show, himax_s2l_set);
 
+/* Manual Sweep2Lock controls!
+		su -c 'echo 0 > /sys/android_touch/s2lactive'
+*/
+static ssize_t himax_s2la_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	size_t count = 0;
+	count += sprintf(buf, "%d\n", private_ts->s2l_activated);
+	return count;
+}
+
+static ssize_t himax_s2la_set(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	if (buf[0] == '1')
+		private_ts->s2l_activated = 1;
+	else
+		private_ts->s2l_activated = 0;
+	return count;
+}
+
+static DEVICE_ATTR(s2lactive, (S_IWUSR|S_IRUGO),
+	himax_s2la_show, himax_s2la_set);
+
 extern void himax_s2w_setinp(struct input_dev *dev) {
 	sweep2wake_pwrdev = dev;
 }
@@ -1220,6 +1244,11 @@ static int himax_touch_sysfs_init(void)
 		printk(KERN_ERR "[TS]%s: sysfs_create_file s2lswitch failed\n", __func__);
 		return ret;
 	}
+	ret = sysfs_create_file(android_touch_kobj, &dev_attr_s2lactive.attr);
+	if (ret) {
+		printk(KERN_ERR "[TS]%s: sysfs_create_file s2lactive failed\n", __func__);
+		return ret;
+	}
 #ifdef FAKE_EVENT
 	ret = sysfs_create_file(android_touch_kobj, &dev_attr_fake_event.attr);
 	if (ret) {
@@ -1247,6 +1276,7 @@ static void himax_touch_sysfs_deinit(void)
 	sysfs_remove_file(android_touch_kobj, &dev_attr_attn.attr);
 	sysfs_remove_file(android_touch_kobj, &dev_attr_s2wswitch.attr);
 	sysfs_remove_file(android_touch_kobj, &dev_attr_s2lswitch.attr);
+	sysfs_remove_file(android_touch_kobj, &dev_attr_s2lactive.attr);
 #ifdef FAKE_EVENT
 	sysfs_remove_file(android_touch_kobj, &dev_attr_fake_event.attr);
 #endif
