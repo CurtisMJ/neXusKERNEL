@@ -103,6 +103,7 @@ static void himax_ts_late_resume(struct early_suspend *h);
 #ifdef HIMAX_S2W
 static struct input_dev * sweep2wake_pwrdev;
 static int s2w_switch = 1;
+static int s2l_switch = 1;
 #endif
 
 int i2c_himax_read(struct i2c_client *client, uint8_t command, uint8_t *data, uint8_t length, uint8_t toRetry)
@@ -1083,6 +1084,30 @@ static ssize_t himax_s2w_set(struct device *dev,
 static DEVICE_ATTR(s2wswitch, (S_IWUSR|S_IRUGO),
 	himax_s2w_show, himax_s2w_set);
 
+/* s2l is enabled by default. to disable, run
+		su -c 'echo 0 > /sys/android_touch/s2lswitch'
+*/
+static ssize_t himax_s2l_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	size_t count = 0;
+	count += sprintf(buf, "%d\n", s2l_switch);
+	return count;
+}
+
+static ssize_t himax_s2l_set(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	if (buf[0] == '1')
+		s2l_switch = 1;
+	else
+		s2l_switch = 0;
+	return count;
+}
+
+static DEVICE_ATTR(s2lswitch, (S_IWUSR|S_IRUGO),
+	himax_s2l_show, himax_s2l_set);
+
 extern void himax_s2w_setinp(struct input_dev *dev) {
 	sweep2wake_pwrdev = dev;
 }
@@ -1117,15 +1142,21 @@ void himax_s2w_func(int x) {
 		private_ts->s2w_activated = 0;
 		private_ts->s2w_x_pos = x;
 	} else {
-		if ((abs(private_ts->s2w_x_pos - x) > 680) && (private_ts->suspend_mode == 1))
-			private_ts->s2w_activated = 1;
-		else if ((abs(private_ts->s2w_x_pos - x) > 680) && (private_ts->suspend_mode == 0))
+		if (abs(private_ts->s2w_x_pos - x) > 680)
 		{
-			// toggle soft key lock
-			if (private_ts->s2l_activated == 0)
-				private_ts->s2l_activated = 1;
+			if (private_ts->suspend_mode == 1)
+				private_ts->s2w_activated = 1;
 			else
-				private_ts->s2l_activated = 0; 
+			{
+				if (s2l_switch == 1)
+				{
+					// toggle soft key lock
+					if (private_ts->s2l_activated == 0)
+						private_ts->s2l_activated = 1;
+					else
+						private_ts->s2l_activated = 0; 
+				}
+			}
 		}
 	}
 }
@@ -1184,6 +1215,11 @@ static int himax_touch_sysfs_init(void)
 		printk(KERN_ERR "[TS]%s: sysfs_create_file s2wswitch failed\n", __func__);
 		return ret;
 	}
+	ret = sysfs_create_file(android_touch_kobj, &dev_attr_s2lswitch.attr);
+	if (ret) {
+		printk(KERN_ERR "[TS]%s: sysfs_create_file s2lswitch failed\n", __func__);
+		return ret;
+	}
 #ifdef FAKE_EVENT
 	ret = sysfs_create_file(android_touch_kobj, &dev_attr_fake_event.attr);
 	if (ret) {
@@ -1210,6 +1246,7 @@ static void himax_touch_sysfs_deinit(void)
 	sysfs_remove_file(android_touch_kobj, &dev_attr_reset.attr);
 	sysfs_remove_file(android_touch_kobj, &dev_attr_attn.attr);
 	sysfs_remove_file(android_touch_kobj, &dev_attr_s2wswitch.attr);
+	sysfs_remove_file(android_touch_kobj, &dev_attr_s2lswitch.attr);
 #ifdef FAKE_EVENT
 	sysfs_remove_file(android_touch_kobj, &dev_attr_fake_event.attr);
 #endif
