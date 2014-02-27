@@ -1174,11 +1174,14 @@ void himax_s2w_func(int x) {
 			{
 				if (s2l_switch == 1)
 				{
-					// toggle soft key lock
-					if (private_ts->s2l_activated == 0)
-						private_ts->s2l_activated = 1;
-					else
-						private_ts->s2l_activated = 0; 
+					if ((private_ts->s2w_x_pos - x) > 600)
+					{
+						// toggle soft key lock
+						if (private_ts->s2l_activated == 0)
+							private_ts->s2l_activated = 1;
+						else
+							private_ts->s2l_activated = 0; 
+					}
 				}
 				else
 					private_ts->s2w_activated = 1;	
@@ -1457,7 +1460,7 @@ inline void himax_ts_work(struct himax_ts_data *ts)
 							himax_s2w_release();
 					}
 				}
-				if (((private_ts->s2l_activated == 0) || (y < ts->pdata->abs_y_max)) && !((s2w_switch) && himax_s2w_status() && (abs(private_ts->s2w_x_pos - x) > 50))) {
+				if (((private_ts->s2l_activated == 0) || (y < ts->pdata->abs_y_max)) && !((s2w_switch) && himax_s2w_status() && (y > ts->pdata->abs_y_max) && (abs(private_ts->s2w_x_pos - x) > 3))) {
 #endif
 
 				if (ts->event_htc_enable_type) {
