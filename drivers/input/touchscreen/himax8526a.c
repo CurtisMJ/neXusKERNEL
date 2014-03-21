@@ -29,6 +29,7 @@
 #include <mach/board.h>
 #include <asm/atomic.h>
 #include <mach/board_htc.h>
+#include <mach/msm_vibrator.h>
 
 void himax_s2w_release(void);
 int himax_s2w_status(void);
@@ -1148,12 +1149,15 @@ int himax_s2w_status() {
 }
 
 void himax_s2w_power(struct work_struct *himax_s2w_power_work) {
+	msleep(100);
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 1);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
 	msleep(100);
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 0);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
+	vibrate(15);
 	msleep(100);
+	himax_ts_late_resume(&private_ts->early_suspend);
 	printk(KERN_INFO "[TS][S2W]%s: Turn it on", __func__);
 	himax_s2w_release();
 }
