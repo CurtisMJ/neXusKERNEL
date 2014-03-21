@@ -17,6 +17,7 @@
 #include <linux/delay.h>
 #include <linux/earlysuspend.h>
 #include <linux/hrtimer.h>
+#include <linux/ktime.h>
 #include <linux/i2c.h>
 #include <linux/input.h>
 #include <linux/interrupt.h>
@@ -31,9 +32,6 @@
 #include <mach/board_htc.h>
 #include <mach/msm_vibrator.h>
 
-void himax_s2w_release(void);
-void himax_s2w_vibpat(void);
-int himax_s2w_status(void);
 
 #ifdef CONFIG_TOUCHSCREEN_HIMAX_S2W
 #define HIMAX_S2W
@@ -43,6 +41,7 @@ int himax_s2w_status(void);
 #define ESD_WORKAROUND
 #define FAKE_EVENT
 #define SUPPORT_FINGER_DATA_CHECKSUM 0x0F
+#define MS_TO_NS(x)	(x * 1E6L)
 
 struct himax_ts_data {
 	int use_irq;
@@ -88,8 +87,8 @@ struct himax_ts_data {
 #ifdef HIMAX_S2W
 	int s2w_touched;
 	int s2w_x_pos;
-	int s2w_activated;
 	int s2l_activated;
+	int s2w_timerdenied;
 #endif
 };
 static struct himax_ts_data *private_ts;
@@ -103,9 +102,17 @@ static void himax_ts_late_resume(struct early_suspend *h);
 #endif
 
 #ifdef HIMAX_S2W
+void himax_s2w_release(void);
+void himax_s2w_vibpat(void);
+void himax_s2w_timerInit(void);
+void himax_s2w_timerStart(void);
+int himax_s2w_status(void);
+enum hrtimer_restart s2w_hrtimer_callback( struct hrtimer *timer );
+
 static struct input_dev * sweep2wake_pwrdev;
 static int s2w_switch = 1;
 static int s2l_switch = 1;
+static struct hrtimer s2w_timer;
 #endif
 
 int i2c_himax_read(struct i2c_client *client, uint8_t command, uint8_t *data, uint8_t length, uint8_t toRetry)
@@ -1062,6 +1069,33 @@ static ssize_t himax_set_en_sr(struct device *dev, struct device_attribute *attr
 static DEVICE_ATTR(sr_en, S_IWUSR, 0, himax_set_en_sr);
 
 #ifdef HIMAX_S2W
+enum hrtimer_restart s2w_hrtimer_callback( struct hrtimer *timer )
+{
+  	printk( "[TS][S2W]Timer set off.\n" );
+	private_ts->s2w_timerdenied = 0;
+  	return HRTIMER_NORESTART;
+}
+
+void himax_s2w_timerInit() {
+	printk("[TS][S2W]Setting up timer\n");
+  	hrtimer_init( &s2w_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL );
+  
+  	s2w_timer.function = &s2w_hrtimer_callback;
+
+  	//hrtimer_start( &hr_timer, ktime, HRTIMER_MODE_REL );
+} 
+
+void himax_s2w_timerStart() {
+	ktime_t ktime;
+ 	unsigned long delay_in_ms = 500L;
+
+  	printk("[TS][S2W]Starting up timer\n");
+
+  	ktime = ktime_set( 0, MS_TO_NS(delay_in_ms) );
+	private_ts->s2w_timerdenied = 1;
+	hrtimer_start( &s2w_timer, ktime, HRTIMER_MODE_REL );	
+}
+
 /* s2w is enabled by default. to disable, run
 		su -c 'echo 0 > /sys/android_touch/s2wswitch'
 */
@@ -1141,7 +1175,6 @@ EXPORT_SYMBOL(himax_s2w_setinp);
 
 void himax_s2w_release() {
 	private_ts->s2w_touched = 0;
-	private_ts->s2w_activated = 0;
 	printk(KERN_INFO "[TS][S2W]%s: Sweep2Wake Released", __func__);
 }
 
@@ -1165,6 +1198,7 @@ void himax_s2w_power(struct work_struct *himax_s2w_power_work) {
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 0);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
 	msleep(100);
+	himax_s2w_vibpat();
 	himax_ts_late_resume(&private_ts->early_suspend);
 	printk(KERN_INFO "[TS][S2W]%s: Turn it on", __func__);
 	himax_s2w_release();
@@ -1175,13 +1209,14 @@ void himax_s2w_func(int x) {
 	//printk(KERN_INFO "[TS][S2W]%s: %d", __func__, x);
 	if (!himax_s2w_status()) {
 		private_ts->s2w_touched = 1;
-		private_ts->s2w_activated = 0;
 		private_ts->s2w_x_pos = x;
 	} else {
 		if (abs(private_ts->s2w_x_pos - x) > 600)
 		{
-			if (private_ts->suspend_mode == 1)
-				private_ts->s2w_activated = 1;
+			if (private_ts->suspend_mode == 1) {
+				himax_s2w_power(&himax_s2w_power_work);	
+				himax_s2w_timerStart();	
+			}
 			else
 			{
 				if (s2l_switch == 1)
@@ -1193,12 +1228,15 @@ void himax_s2w_func(int x) {
 							private_ts->s2l_activated = 1;
 						else
 							private_ts->s2l_activated = 0; 
+						himax_s2w_timerStart();	 
 					}
 				}
 				else
-					private_ts->s2w_activated = 1;	
+				{
+					himax_s2w_power(&himax_s2w_power_work);	
+					himax_s2w_timerStart();	
+				}	
 			}
-			himax_s2w_vibpat();
 		}
 	}
 }
@@ -1444,11 +1482,7 @@ inline void himax_ts_work(struct himax_ts_data *ts)
 #ifdef HIMAX_S2W
 		if (s2w_switch) {
 			if (himax_s2w_status())
-			{
-				if (private_ts->s2w_activated == 1)
-					himax_s2w_power(&himax_s2w_power_work);	
 				himax_s2w_release();
-			}
 		}
 #endif
 	} else {
@@ -1466,7 +1500,7 @@ inline void himax_ts_work(struct himax_ts_data *ts)
 
 #ifdef HIMAX_S2W
 				if (s2w_switch) {
-					if (y > ts->pdata->abs_y_max) {
+					if ((y > ts->pdata->abs_y_max) && !private_ts->s2w_timerdenied) {
 						himax_s2w_func(x);
 					} else {
 						if (himax_s2w_status())
@@ -1835,6 +1869,7 @@ static int himax8526a_probe(struct i2c_client *client, const struct i2c_device_i
 	}
 #ifdef HIMAX_S2W
 	private_ts->s2w_touched = 0;
+	himax_s2w_timerInit();
 #endif
 	return 0;
 
@@ -1856,6 +1891,7 @@ err_check_functionality_failed:
 
 static int himax8526a_remove(struct i2c_client *client)
 {
+	int ret;
 	struct himax_ts_data *ts = i2c_get_clientdata(client);
 
 	himax_touch_sysfs_deinit();
@@ -1874,6 +1910,9 @@ static int himax8526a_remove(struct i2c_client *client)
 	input_unregister_device(ts->input_dev);
 	kfree(ts->diag_mutual);
 	kfree(ts);
+
+  	ret = hrtimer_cancel( &s2w_timer );
+  	if (ret) printk("[TS][S2W]The timer was still in use...\n");
 
 	return 0;
 
