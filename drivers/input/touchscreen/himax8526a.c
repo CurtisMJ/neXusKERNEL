@@ -32,6 +32,7 @@
 #include <mach/msm_vibrator.h>
 
 void himax_s2w_release(void);
+void himax_s2w_vibpat(void);
 int himax_s2w_status(void);
 
 #ifdef CONFIG_TOUCHSCREEN_HIMAX_S2W
@@ -1148,6 +1149,14 @@ int himax_s2w_status() {
 	return private_ts->s2w_touched;
 }
 
+void himax_s2w_vibpat() {
+	vibrate(15);
+	msleep(50);
+	vibrate(30);
+	msleep(80);
+	vibrate(15);
+} 
+
 void himax_s2w_power(struct work_struct *himax_s2w_power_work) {
 	msleep(100);
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 1);
@@ -1155,7 +1164,6 @@ void himax_s2w_power(struct work_struct *himax_s2w_power_work) {
 	msleep(100);
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 0);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
-	vibrate(15);
 	msleep(100);
 	himax_ts_late_resume(&private_ts->early_suspend);
 	printk(KERN_INFO "[TS][S2W]%s: Turn it on", __func__);
@@ -1190,6 +1198,7 @@ void himax_s2w_func(int x) {
 				else
 					private_ts->s2w_activated = 1;	
 			}
+			himax_s2w_vibpat();
 		}
 	}
 }
