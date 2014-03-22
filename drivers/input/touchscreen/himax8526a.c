@@ -1195,7 +1195,6 @@ void himax_s2w_power(struct work_struct *himax_s2w_power_work) {
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 0);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
 	himax_s2w_vibpat();
-	himax_ts_late_resume(&private_ts->early_suspend);
 	printk(KERN_INFO "[TS][S2W]%s: Turn it on", __func__);
 	himax_s2w_release();
 }
@@ -1992,12 +1991,12 @@ static int himax8526a_resume(struct i2c_client *client)
 	disable_irq_wake(client->irq);
 #endif
 	printk(KERN_INFO "[TP]%s: enter\n", __func__);
-	if (ts->pdata->powerOff3V3 && ts->pdata->power)
-		ts->pdata->power(1);
-
 #ifdef HIMAX_S2W
 	if (!s2w_switch) {
 #endif
+	if (ts->pdata->powerOff3V3 && ts->pdata->power)
+		ts->pdata->power(1);
+
 	data[0] = 0x00;
 	i2c_himax_write(ts->client, 0xD7, &data[0], 1, HIMAX_I2C_RETRY_TIMES);
 	hr_msleep(5);
@@ -2022,9 +2021,6 @@ static int himax8526a_resume(struct i2c_client *client)
 	hr_msleep(30);
 
 	i2c_himax_write_command(ts->client, 0x81, HIMAX_I2C_RETRY_TIMES);
-#ifdef HIMAX_S2W
-	}
-#endif
 #if 0
 	printk(KERN_DEBUG "[TP]%s: diag_command= %d\n", __func__, ts->diag_command);
 #endif
@@ -2043,7 +2039,9 @@ static int himax8526a_resume(struct i2c_client *client)
 
 	i2c_himax_master_write(ts->client, ts->cable_config,
 		 sizeof(ts->cable_config), HIMAX_I2C_RETRY_TIMES);
-
+#ifdef HIMAX_S2W
+	}
+#endif
 	ts->suspend_mode = 0;
 #ifdef HIMAX_S2W
 	ts->s2w_touched = 0;
