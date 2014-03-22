@@ -113,6 +113,7 @@ static struct input_dev * sweep2wake_pwrdev;
 static int s2w_switch = 1;
 static int s2l_switch = 1;
 static struct hrtimer s2w_timer;
+static ktime_t s2w_ktime;
 #endif
 
 int i2c_himax_read(struct i2c_client *client, uint8_t command, uint8_t *data, uint8_t length, uint8_t toRetry)
@@ -1077,23 +1078,22 @@ enum hrtimer_restart s2w_hrtimer_callback( struct hrtimer *timer )
 }
 
 void himax_s2w_timerInit() {
+	unsigned long delay_in_ms = 500L;	
+
 	printk("[TS][S2W]Setting up timer\n");
   	hrtimer_init( &s2w_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL );
-  
+  	s2w_ktime = ktime_set( 0, MS_TO_NS(delay_in_ms) );
   	s2w_timer.function = &s2w_hrtimer_callback;
-
+	
   	//hrtimer_start( &hr_timer, ktime, HRTIMER_MODE_REL );
 } 
 
 void himax_s2w_timerStart() {
-	ktime_t ktime;
- 	unsigned long delay_in_ms = 500L;
-
   	printk("[TS][S2W]Starting up timer\n");
-
-  	ktime = ktime_set( 0, MS_TO_NS(delay_in_ms) );
-	private_ts->s2w_timerdenied = 1;
-	hrtimer_start( &s2w_timer, ktime, HRTIMER_MODE_REL );	
+	if (!private_ts->s2w_timerdenied) {
+		private_ts->s2w_timerdenied = 1;
+		hrtimer_start( &s2w_timer, s2w_ktime, HRTIMER_MODE_REL );	
+	}
 }
 
 /* s2w is enabled by default. to disable, run
@@ -1186,18 +1186,14 @@ void himax_s2w_vibpat() {
 	vibrate(15);
 	msleep(50);
 	vibrate(30);
-	msleep(80);
-	vibrate(15);
 } 
 
 void himax_s2w_power(struct work_struct *himax_s2w_power_work) {
-	msleep(100);
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 1);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
 	msleep(100);
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 0);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
-	msleep(100);
 	himax_s2w_vibpat();
 	himax_ts_late_resume(&private_ts->early_suspend);
 	printk(KERN_INFO "[TS][S2W]%s: Turn it on", __func__);
@@ -1224,6 +1220,7 @@ void himax_s2w_func(int x) {
 					if ((private_ts->s2w_x_pos - x) > 600)
 					{
 						// toggle soft key lock
+						printk(KERN_INFO "[TS][S2W]%s: Soft key lock toggled", __func__);
 						if (private_ts->s2l_activated == 0)
 							private_ts->s2l_activated = 1;
 						else
