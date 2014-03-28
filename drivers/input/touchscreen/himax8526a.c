@@ -1918,7 +1918,7 @@ static int himax8526a_suspend(struct i2c_client *client, pm_message_t mesg)
 {
 	int ret;
 	uint8_t data = 0x01;
-	struct himax_ts_data *ts = i2c_get_clientdata(client);
+	struct himax_ts_data *ts = private_ts;
 #ifdef HIMAX_S2W
 	if (!s2w_switch) {
 #endif
@@ -1932,8 +1932,8 @@ static int himax8526a_suspend(struct i2c_client *client, pm_message_t mesg)
 
 	printk(KERN_DEBUG "[TP]%s: diag_command= %d\n", __func__, ts->diag_command);
 #ifdef HIMAX_S2W
-	if (s2w_switch)
-		enable_irq_wake(client->irq);
+	//if (s2w_switch)
+	//	enable_irq_wake(client->irq);
 #endif
 
 	printk(KERN_INFO "[TP]%s: enter\n", __func__);
@@ -1984,10 +1984,10 @@ static int himax8526a_resume(struct i2c_client *client)
 	const uint8_t command_ec_128_raw_baseline_flag = 0x02 | command_ec_128_raw_flag;
 	uint8_t new_command[2] = {0x91, 0x00};
 
-	struct himax_ts_data *ts = i2c_get_clientdata(client);
+	struct himax_ts_data *ts = private_ts;
 #ifdef HIMAX_S2W
-	if (s2w_switch)
-	disable_irq_wake(client->irq);
+	//if (s2w_switch)
+	//disable_irq_wake(client->irq);
 #endif
 	printk(KERN_INFO "[TP]%s: enter\n", __func__);
 #ifdef HIMAX_S2W
