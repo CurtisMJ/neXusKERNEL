@@ -1918,7 +1918,7 @@ static int himax8526a_suspend(struct i2c_client *client, pm_message_t mesg)
 {
 	int ret;
 	uint8_t data = 0x01;
-	struct himax_ts_data *ts = private_ts;
+	struct himax_ts_data *ts = i2c_get_clientdata(client);
 #ifdef HIMAX_S2W
 	if (!s2w_switch) {
 #endif
@@ -1932,27 +1932,34 @@ static int himax8526a_suspend(struct i2c_client *client, pm_message_t mesg)
 
 	printk(KERN_DEBUG "[TP]%s: diag_command= %d\n", __func__, ts->diag_command);
 #ifdef HIMAX_S2W
-	//if (s2w_switch)
-	//	enable_irq_wake(client->irq);
+	if (s2w_switch)
+		enable_irq_wake(client->irq);
 #endif
 
 	printk(KERN_INFO "[TP]%s: enter\n", __func__);
 #ifdef HIMAX_S2W
-	if (!s2w_switch) {
+	if (!s2w_switch)
 #endif
 
 	disable_irq(client->irq);
 
 	if (!ts->use_irq) {
 		ret = cancel_work_sync(&ts->work);
-
+#ifdef HIMAX_S2W
+		if (!s2w_switch) {
+#endif
 		if (ret && ts->use_irq)
 			enable_irq(client->irq);
-
+#ifdef HIMAX_S2W
+		}
+#endif
 		if (ret)
 			enable_irq(client->irq);
 	}
 
+#ifdef HIMAX_S2W
+	if (!s2w_switch) {
+#endif
 	i2c_himax_write_command(ts->client, 0x82, HIMAX_I2C_RETRY_TIMES);
 	msleep(30);
 	i2c_himax_write_command(ts->client, 0x80, HIMAX_I2C_RETRY_TIMES);
@@ -1965,15 +1972,9 @@ static int himax8526a_suspend(struct i2c_client *client, pm_message_t mesg)
 	ts->first_pressed = 0;
 	ts->suspend_mode = 1;
 	ts->pre_finger_mask = 0;
-#ifdef HIMAX_S2W
-	if (!s2w_switch) {
-#endif
-
 	if (ts->pdata->powerOff3V3 && ts->pdata->power)
 		ts->pdata->power(0);
-#ifdef HIMAX_S2W
-	}
-#endif
+
 	return 0;
 }
 
@@ -1984,18 +1985,18 @@ static int himax8526a_resume(struct i2c_client *client)
 	const uint8_t command_ec_128_raw_baseline_flag = 0x02 | command_ec_128_raw_flag;
 	uint8_t new_command[2] = {0x91, 0x00};
 
-	struct himax_ts_data *ts = private_ts;
+	struct himax_ts_data *ts = i2c_get_clientdata(client);
 #ifdef HIMAX_S2W
-	//if (s2w_switch)
-	//disable_irq_wake(client->irq);
+	if (s2w_switch)
+	disable_irq_wake(client->irq);
 #endif
 	printk(KERN_INFO "[TP]%s: enter\n", __func__);
-#ifdef HIMAX_S2W
-	if (!s2w_switch) {
-#endif
 	if (ts->pdata->powerOff3V3 && ts->pdata->power)
 		ts->pdata->power(1);
 
+#ifdef HIMAX_S2W
+	if (!s2w_switch) {
+#endif
 	data[0] = 0x00;
 	i2c_himax_write(ts->client, 0xD7, &data[0], 1, HIMAX_I2C_RETRY_TIMES);
 	hr_msleep(5);
@@ -2020,6 +2021,9 @@ static int himax8526a_resume(struct i2c_client *client)
 	hr_msleep(30);
 
 	i2c_himax_write_command(ts->client, 0x81, HIMAX_I2C_RETRY_TIMES);
+#ifdef HIMAX_S2W
+	}
+#endif
 #if 0
 	printk(KERN_DEBUG "[TP]%s: diag_command= %d\n", __func__, ts->diag_command);
 #endif
@@ -2038,9 +2042,7 @@ static int himax8526a_resume(struct i2c_client *client)
 
 	i2c_himax_master_write(ts->client, ts->cable_config,
 		 sizeof(ts->cable_config), HIMAX_I2C_RETRY_TIMES);
-#ifdef HIMAX_S2W
-	}
-#endif
+
 	ts->suspend_mode = 0;
 #ifdef HIMAX_S2W
 	ts->s2w_touched = 0;
@@ -2055,7 +2057,6 @@ static int himax8526a_resume(struct i2c_client *client)
 
 	return 0;
 }
-
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void himax_ts_early_suspend(struct early_suspend *h)
