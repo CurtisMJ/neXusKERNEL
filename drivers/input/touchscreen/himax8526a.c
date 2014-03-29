@@ -16,6 +16,7 @@
 #include <linux/himax8526a.h>
 #include <linux/delay.h>
 #include <linux/earlysuspend.h>
+#include <linux/suspend.h>
 #include <linux/hrtimer.h>
 #include <linux/ktime.h>
 #include <linux/i2c.h>
@@ -111,7 +112,7 @@ enum hrtimer_restart s2w_hrtimer_callback( struct hrtimer *timer );
 
 static struct input_dev * sweep2wake_pwrdev;
 static int s2w_switch = 1;
-static int s2l_switch = 1;
+static int s2l_switch = 0;
 static struct hrtimer s2w_timer;
 static ktime_t s2w_ktime;
 #endif
@@ -1120,7 +1121,7 @@ static ssize_t himax_s2w_set(struct device *dev,
 static DEVICE_ATTR(s2wswitch, (S_IWUSR|S_IRUGO),
 	himax_s2w_show, himax_s2w_set);
 
-/* s2l is enabled by default. to disable, run
+/* s2l is disabled by default. to disable, run
 		su -c 'echo 0 > /sys/android_touch/s2lswitch'
 */
 static ssize_t himax_s2l_show(struct device *dev,
@@ -1183,18 +1184,17 @@ int himax_s2w_status() {
 }
 
 void himax_s2w_vibpat() {
-	vibrate(15);
-	msleep(50);
 	vibrate(30);
 } 
 
 void himax_s2w_power(struct work_struct *himax_s2w_power_work) {
+	int state = (get_suspend_state() == 2) ? 2 : 0;
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 1);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
 	msleep(100);
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 0);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
-	himax_s2w_vibpat();
+	request_suspend_state(state);
 	printk(KERN_INFO "[TS][S2W]%s: Turn it on", __func__);
 	himax_s2w_release();
 }
@@ -1233,6 +1233,7 @@ void himax_s2w_func(int x) {
 					himax_s2w_timerStart();	
 				}	
 			}
+			himax_s2w_vibpat();
 		}
 	}
 }

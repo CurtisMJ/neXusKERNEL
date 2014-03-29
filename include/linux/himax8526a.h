@@ -6,6 +6,7 @@
 
 #define HIMAX8526A_NAME "Himax8526a"
 #define HIMAX8526A_FINGER_SUPPORT_NUM 4
+
 struct himax_config_init_api {
 	int (*i2c_himax_master_write)(struct i2c_client *client, uint8_t *data, uint8_t length, uint8_t retry);
 	int (*i2c_himax_write_command)(struct i2c_client *client, uint8_t command, uint8_t retry);
@@ -241,6 +242,8 @@ struct himax_i2c_platform_data {
 	int type2_size;
 	struct himax_i2c_platform_data_config_type_3 *type3;
 	int type3_size;
+
+	bool wakeup;
 };
 
 enum input_protocol_type {

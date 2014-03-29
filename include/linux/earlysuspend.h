@@ -20,6 +20,8 @@
 #include <linux/list.h>
 #endif
 
+#include <linux/suspend.h>
+
 enum {
 	EARLY_SUSPEND_LEVEL_BLANK_SCREEN = 50,
 	EARLY_SUSPEND_LEVEL_STOP_DRAWING = 100,
@@ -37,6 +39,8 @@ struct early_suspend {
 #ifdef CONFIG_HAS_EARLYSUSPEND
 void register_early_suspend(struct early_suspend *handler);
 void unregister_early_suspend(struct early_suspend *handler);
+void request_suspend_state(suspend_state_t new_state);
+suspend_state_t get_suspend_state(void);
 #else
 #define register_early_suspend(handler) do { } while (0)
 #define unregister_early_suspend(handler) do { } while (0)

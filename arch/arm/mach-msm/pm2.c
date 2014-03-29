@@ -1397,7 +1397,7 @@ void arch_idle(void)
 
 }
 
-static int msm_pm_enter(suspend_state_t state)
+int msm_pm_enter(suspend_state_t state)
 {
 	bool allow[MSM_PM_SLEEP_MODE_NR];
 	uint32_t sleep_limit = SLEEP_LIMIT_NONE;
