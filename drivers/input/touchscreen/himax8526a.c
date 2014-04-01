@@ -107,6 +107,7 @@ void himax_s2w_release(void);
 void himax_s2w_vibpat(void);
 void himax_s2w_timerInit(void);
 void himax_s2w_timerStart(void);
+int himax_s2w_resetChip(void);
 int himax_s2w_status(void);
 enum hrtimer_restart s2w_hrtimer_callback( struct hrtimer *timer );
 
@@ -1078,6 +1079,30 @@ enum hrtimer_restart s2w_hrtimer_callback( struct hrtimer *timer )
   	return HRTIMER_NORESTART;
 }
 
+int himax_s2w_resetChip() {
+	struct himax_ts_data *ts_data;
+	int ret = 0;
+	ts_data = private_ts;
+	if (ts_data->pdata->reset) {
+		if (ts_data->use_irq)
+			disable_irq_nosync(ts_data->client->irq);
+		else {
+			hrtimer_cancel(&ts_data->timer);
+			ret = cancel_work_sync(&ts_data->work);
+		}
+
+		printk(KERN_INFO "[TP]%s: Now reset the Touch chip.\n", __func__);
+
+		ts_data->pdata->reset();
+
+		if (ts_data->use_irq)
+			enable_irq(ts_data->client->irq);
+		else
+			hrtimer_start(&ts_data->timer, ktime_set(1, 0), HRTIMER_MODE_REL);
+	}
+	return 1;
+}
+
 void himax_s2w_timerInit() {
 	unsigned long delay_in_ms = 500L;	
 
@@ -1188,13 +1213,12 @@ void himax_s2w_vibpat() {
 } 
 
 void himax_s2w_power(struct work_struct *himax_s2w_power_work) {
-	int state = (get_suspend_state() == 2) ? 2 : 0;
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 1);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
 	msleep(100);
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 0);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
-	request_suspend_state(state);
+	himax_s2w_resetChip();
 	printk(KERN_INFO "[TS][S2W]%s: Turn it on", __func__);
 	himax_s2w_release();
 }
