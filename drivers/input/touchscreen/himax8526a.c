@@ -1075,6 +1075,28 @@ static ssize_t himax_set_en_sr(struct device *dev, struct device_attribute *attr
 static DEVICE_ATTR(sr_en, S_IWUSR, 0, himax_set_en_sr);
 
 #ifdef HIMAX_S2W
+void himax_s2w_power(struct work_struct *himax_s2w_power_work) {
+	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 1);
+	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
+	msleep(100);
+	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 0);
+	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
+	
+	printk(KERN_INFO "[TS][S2W]%s: Turn it on", __func__);
+	himax_s2w_release();
+}
+static DECLARE_WORK(himax_s2w_power_work, himax_s2w_power);
+
+extern void himax_s2w_setinp(struct input_dev *dev) {
+	sweep2wake_pwrdev = dev;
+}
+EXPORT_SYMBOL(himax_s2w_setinp);
+
+void himax_s2w_release() {
+	private_ts->s2w_touched = 0;
+	printk(KERN_INFO "[TS][S2W]%s: Sweep2Wake Released", __func__);
+}
+
 enum hrtimer_restart s2w_hrtimer_callback( struct hrtimer *timer )
 {
   	printk(KERN_INFO "[TS][S2W]%s: Timer finished", __func__);
@@ -1207,16 +1229,6 @@ static ssize_t himax_s2la_set(struct device *dev,
 static DEVICE_ATTR(s2lactive, (S_IWUSR|S_IRUGO),
 	himax_s2la_show, himax_s2la_set);
 
-extern void himax_s2w_setinp(struct input_dev *dev) {
-	sweep2wake_pwrdev = dev;
-}
-EXPORT_SYMBOL(himax_s2w_setinp);
-
-void himax_s2w_release() {
-	private_ts->s2w_touched = 0;
-	printk(KERN_INFO "[TS][S2W]%s: Sweep2Wake Released", __func__);
-}
-
 int himax_s2w_status() {
 	return private_ts->s2w_touched;
 }
@@ -1224,18 +1236,6 @@ int himax_s2w_status() {
 void himax_s2w_vibpat() {
 	vibrate(30);
 } 
-
-void himax_s2w_power(struct work_struct *himax_s2w_power_work) {
-	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 1);
-	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
-	msleep(100);
-	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 0);
-	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
-	
-	printk(KERN_INFO "[TS][S2W]%s: Turn it on", __func__);
-	himax_s2w_release();
-}
-static DECLARE_WORK(himax_s2w_power_work, himax_s2w_power);
 
 void himax_s2w_func(int x) {
 	//printk(KERN_INFO "[TS][S2W]%s: %d", __func__, x);
