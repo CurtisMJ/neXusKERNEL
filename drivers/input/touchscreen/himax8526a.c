@@ -1074,7 +1074,7 @@ static DEVICE_ATTR(sr_en, S_IWUSR, 0, himax_set_en_sr);
 #ifdef HIMAX_S2W
 enum hrtimer_restart s2w_hrtimer_callback( struct hrtimer *timer )
 {
-  	printk( "[TS][S2W]Timer set off.\n" );
+  	printk(KERN_INFO "[TS][S2W]%s: Timer finished", __func__);
 	himax_s2w_resetChip();
 	private_ts->s2w_timerdenied = 0;
   	return HRTIMER_NORESTART;
@@ -1092,7 +1092,7 @@ int himax_s2w_resetChip() {
 			ret = cancel_work_sync(&ts_data->work);
 		}
 
-		printk(KERN_INFO "[TP]%s: Now reset the Touch chip.\n", __func__);
+		printk(KERN_INFO "[TP]%s: Now reset the Touch chip(S2W initiated).\n", __func__);
 
 		ts_data->pdata->reset();
 
@@ -1107,7 +1107,7 @@ int himax_s2w_resetChip() {
 void himax_s2w_timerInit() {
 	unsigned long delay_in_ms = 500L;	
 
-	printk("[TS][S2W]Setting up timer\n");
+	printk(KERN_INFO "[TS][S2W]%s: Setting up timers", __func__);
   	hrtimer_init( &s2w_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL );
   	s2w_ktime = ktime_set( 0, MS_TO_NS(delay_in_ms) );
   	s2w_timer.function = &s2w_hrtimer_callback;
@@ -1116,7 +1116,7 @@ void himax_s2w_timerInit() {
 } 
 
 void himax_s2w_timerStart() {
-  	printk("[TS][S2W]Starting up timer\n");
+  	printk(KERN_INFO "[TS][S2W]%s: Timer activated.", __func__);
 	if (!private_ts->s2w_timerdenied) {
 		private_ts->s2w_timerdenied = 1;
 		hrtimer_start( &s2w_timer, s2w_ktime, HRTIMER_MODE_REL );	
@@ -2080,7 +2080,6 @@ static int himax8526a_resume(struct i2c_client *client)
 	enable_irq(client->irq);
 #ifdef HIMAX_S2W
 	}
-	himax_s2w_timerStart();	
 #endif
 
 	return 0;
