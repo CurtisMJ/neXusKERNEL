@@ -1177,7 +1177,7 @@ static ssize_t himax_x2wSettings_show(struct device *dev,
 static ssize_t himax_x2wSettings_set(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	if (strlen(buf) == 4) {
+	if (sizeof(buf) == 4) {
 		if (buf[0] == '1')
 			s2w_switch = 1;
 		else
