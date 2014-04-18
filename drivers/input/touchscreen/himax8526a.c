@@ -114,6 +114,8 @@ enum hrtimer_restart s2w_hrtimer_callback( struct hrtimer *timer );
 static struct input_dev * sweep2wake_pwrdev;
 static int s2w_switch = 1;
 static int s2l_switch = 0;
+static int h2w_switch = 0;
+static int dt2w_switch = 0;
 static struct hrtimer s2w_timer;
 static ktime_t s2w_ktime;
 #endif
@@ -1123,53 +1125,53 @@ void himax_s2w_timerStart() {
 	}
 }
 
-/* s2w is enabled by default. to disable, run
-		su -c 'echo 0 > /sys/android_touch/s2wswitch'
+/* s2w is enabled by default. 
+	USAGE:
+	format: xyza
+	x: s2w on-off [0-1]
+	y: s2l on-off [0-1]
+	z: h2w on-off [0-1]
+	a: dt2w on-off [0-1]
 */
-static ssize_t himax_s2w_show(struct device *dev,
+static ssize_t himax_x2wSettings_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	size_t count = 0;
-	count += sprintf(buf, "%d\n", s2w_switch);
+	count += sprintf(buf + count, "%d\n", s2w_switch);
+	count += sprintf(buf + count, "%d\n", s2l_switch);
+	count += sprintf(buf + count, "%d\n", h2w_switch);
+	count += sprintf(buf + count, "%d\n", dt2w_switch);
 	return count;
 }
 
-static ssize_t himax_s2w_set(struct device *dev,
+static ssize_t himax_x2wSettings_set(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	if (buf[0] == '1')
 		s2w_switch = 1;
 	else
 		s2w_switch = 0;
-	return count;
-}
 
-static DEVICE_ATTR(s2wswitch, (S_IWUSR|S_IRUGO),
-	himax_s2w_show, himax_s2w_set);
-
-/* s2l is disabled by default. to disable, run
-		su -c 'echo 0 > /sys/android_touch/s2lswitch'
-*/
-static ssize_t himax_s2l_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	size_t count = 0;
-	count += sprintf(buf, "%d\n", s2l_switch);
-	return count;
-}
-
-static ssize_t himax_s2l_set(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	if (buf[0] == '1')
+	if (buf[1] == '1')
 		s2l_switch = 1;
 	else
 		s2l_switch = 0;
+
+	if (buf[2] == '1')
+		h2w_switch = 1;
+	else
+		h2w_switch = 0;
+
+	if (buf[3] == '1')
+		dt2w_switch = 1;
+	else
+		dt2w_switch = 0;
 	return count;
 }
 
-static DEVICE_ATTR(s2lswitch, (S_IWUSR|S_IRUGO),
-	himax_s2l_show, himax_s2l_set);
+static DEVICE_ATTR(x2wsettings, (S_IWUSR|S_IRUGO),
+	himax_x2wSettings_show, himax_x2wSettings_set);
+
 
 /* Manual Sweep2Lock controls!
 		su -c 'echo 0 > /sys/android_touch/s2lactive'
@@ -1312,14 +1314,9 @@ static int himax_touch_sysfs_init(void)
 		printk(KERN_ERR "[TP][TOUCH_ERR]%s: sysfs_create_file failed\n", __func__);
 		return ret;
 	}
-	ret = sysfs_create_file(android_touch_kobj, &dev_attr_s2wswitch.attr);
+	ret = sysfs_create_file(android_touch_kobj, &dev_attr_x2wsettings.attr);
 	if (ret) {
-		printk(KERN_ERR "[TS]%s: sysfs_create_file s2wswitch failed\n", __func__);
-		return ret;
-	}
-	ret = sysfs_create_file(android_touch_kobj, &dev_attr_s2lswitch.attr);
-	if (ret) {
-		printk(KERN_ERR "[TS]%s: sysfs_create_file s2lswitch failed\n", __func__);
+		printk(KERN_ERR "[TS]%s: sysfs_create_file x2wSettings failed\n", __func__);
 		return ret;
 	}
 	ret = sysfs_create_file(android_touch_kobj, &dev_attr_s2lactive.attr);
@@ -1352,8 +1349,7 @@ static void himax_touch_sysfs_deinit(void)
 	sysfs_remove_file(android_touch_kobj, &dev_attr_htc_event.attr);
 	sysfs_remove_file(android_touch_kobj, &dev_attr_reset.attr);
 	sysfs_remove_file(android_touch_kobj, &dev_attr_attn.attr);
-	sysfs_remove_file(android_touch_kobj, &dev_attr_s2wswitch.attr);
-	sysfs_remove_file(android_touch_kobj, &dev_attr_s2lswitch.attr);
+	sysfs_remove_file(android_touch_kobj, &dev_attr_x2wsettings.attr);
 	sysfs_remove_file(android_touch_kobj, &dev_attr_s2lactive.attr);
 #ifdef FAKE_EVENT
 	sysfs_remove_file(android_touch_kobj, &dev_attr_fake_event.attr);
