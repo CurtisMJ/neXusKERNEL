@@ -105,6 +105,7 @@ static void himax_ts_late_resume(struct early_suspend *h);
 #endif
 
 #ifdef HIMAX_S2W
+static DEFINE_MUTEX(pwrkeyworklock);
 void himax_s2w_release(void);
 void himax_s2w_vibpat(void);
 void himax_s2w_timerInit(void);
@@ -1099,6 +1100,9 @@ void himax_s2w_timerInit() {
 	hrtimer_init( &h2w_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL );
 	h2w_ktime = ktime_set( 0, MS_TO_NS(h2w_delay_in_ms) );
   	h2w_timer.function = &h2w_hrtimer_callback;
+
+	private_ts->s2w_timerdenied = 0;	
+	private_ts->h2w_timerdenied = 0;
 	
   	//hrtimer_start( &hr_timer, ktime, HRTIMER_MODE_REL );
 } 
@@ -1121,13 +1125,16 @@ void himax_h2w_timerStart() {
 
 
 void himax_s2w_power(struct work_struct *himax_s2w_power_work) {
+	if (!mutex_trylock(&pwrkeyworklock))
+                return;
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 1);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
 	msleep(100);
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 0);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
-	
+	msleep(100);
 	printk(KERN_INFO "[TS][S2W]%s: Turn it on\n", __func__);
+	mutex_unlock(&pwrkeyworklock);
 	himax_s2w_release();
 }
 static DECLARE_WORK(himax_s2w_power_work, himax_s2w_power);
@@ -1164,7 +1171,7 @@ enum hrtimer_restart h2w_hrtimer_callback( struct hrtimer *timer )
 	if (private_ts->h2w_active == 1){
 		private_ts->h2w_active = 0;
 		printk(KERN_INFO "[TS][S2W]%s: H2W Activated\n", __func__);
-		himax_s2w_power(&himax_s2w_power_work);	
+		schedule_work(&himax_s2w_power_work);	
 		himax_s2w_timerStart();	
 		himax_s2w_vibpat();	
 	}
@@ -1280,7 +1287,7 @@ void himax_s2w_func(int x) {
 		xDiff = private_ts->s2w_x_pos - x;
 		if ((abs(xDiff) > 600) && s2w_switch && ((private_ts->suspend_mode == 1) || (s2l_switch == 0)) )
 		{
-			himax_s2w_power(&himax_s2w_power_work);	
+			schedule_work(&himax_s2w_power_work);	
 			himax_s2w_timerStart();	
 			himax_s2w_vibpat();
 		}
