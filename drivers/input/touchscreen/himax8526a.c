@@ -1080,6 +1080,13 @@ enum hrtimer_restart s2w_hrtimer_callback( struct hrtimer *timer )
   	printk(KERN_INFO "[TS][S2W]%s: Timer finished", __func__);
 	himax_s2w_resetChip();
 	private_ts->s2w_timerdenied = 0;
+	if (h2w_switch && (private_ts->h2w_active == 1)){
+		himax_s2w_power(&himax_s2w_power_work);	
+		himax_s2w_timerStart();	
+		himax_s2w_vibpat();	
+	}
+		
+	private_ts->h2w_active = 0;
   	return HRTIMER_NORESTART;
 }
 
