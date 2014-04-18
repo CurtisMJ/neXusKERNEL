@@ -90,6 +90,7 @@ struct himax_ts_data {
 	int s2w_x_pos;
 	int s2l_activated;
 	int s2w_timerdenied;
+	int h2w_active;
 #endif
 };
 static struct himax_ts_data *private_ts;
@@ -1147,25 +1148,27 @@ static ssize_t himax_x2wSettings_show(struct device *dev,
 static ssize_t himax_x2wSettings_set(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	if (buf[0] == '1')
-		s2w_switch = 1;
-	else
-		s2w_switch = 0;
+	if (strlen(buf) == 4) {
+		if (buf[0] == '1')
+			s2w_switch = 1;
+		else
+			s2w_switch = 0;
 
-	if (buf[1] == '1')
-		s2l_switch = 1;
-	else
-		s2l_switch = 0;
+		if (buf[1] == '1')
+			s2l_switch = 1;
+		else
+			s2l_switch = 0;
 
-	if (buf[2] == '1')
-		h2w_switch = 1;
-	else
-		h2w_switch = 0;
+		if (buf[2] == '1')
+			h2w_switch = 1;
+		else
+			h2w_switch = 0;
 
-	if (buf[3] == '1')
-		dt2w_switch = 1;
-	else
-		dt2w_switch = 0;
+		if (buf[3] == '1')
+			dt2w_switch = 1;
+		else
+			dt2w_switch = 0;
+	}
 	return count;
 }
 
@@ -1229,18 +1232,20 @@ static DECLARE_WORK(himax_s2w_power_work, himax_s2w_power);
 
 void himax_s2w_func(int x) {
 	//printk(KERN_INFO "[TS][S2W]%s: %d", __func__, x);
+	int xDiff = 0;
 	if (!himax_s2w_status()) {
 		private_ts->s2w_touched = 1;
 		private_ts->s2w_x_pos = x;
 	} else {
-		if ((abs(private_ts->s2w_x_pos - x) > 600) && s2w_switch && ((private_ts->suspend_mode == 1) || (s2l_switch == 0)) )
+		xDiff = private_ts->s2w_x_pos - x;
+		if ((abs(xDiff) > 600) && s2w_switch && ((private_ts->suspend_mode == 1) || (s2l_switch == 0)) )
 		{
 			himax_s2w_power(&himax_s2w_power_work);	
 			himax_s2w_timerStart();	
 			himax_s2w_vibpat();
 		}
 		// the below code has been isolated to support s2l even when s2w is not enabled
-		if ((s2l_switch == 1) && (private_ts->suspend_mode == 0) && ((private_ts->s2w_x_pos - x) > 600))
+		if ((s2l_switch == 1) && (private_ts->suspend_mode == 0) && (xDiff > 600))
 		{
 			// toggle soft key lock
 			printk(KERN_INFO "[TS][S2W]%s: Soft key lock toggled", __func__);
@@ -1251,8 +1256,14 @@ void himax_s2w_func(int x) {
 			himax_s2w_timerStart();	 
 			himax_s2w_vibpat();
 		}
-		if (h2w_switch == 1) {
-			
+		// the below code assumes s2w is not on
+		if ((h2w_switch == 1) && (private_ts->suspend_mode == 1) ){
+			if ((abs(xDiff) < 50) && (private_ts->h2w_active == 0)) {
+				private_ts->h2w_active = 1;
+				himax_s2w_timerStart();	 
+			}
+			else if (abs(xDiff) >= 50)
+				private_ts->h2w_active = 0;	
 		}
 	}
 }
