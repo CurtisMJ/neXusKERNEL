@@ -1075,6 +1075,7 @@ static DEVICE_ATTR(sr_en, S_IWUSR, 0, himax_set_en_sr);
 enum hrtimer_restart s2w_hrtimer_callback( struct hrtimer *timer )
 {
   	printk( "[TS][S2W]Timer set off.\n" );
+	himax_s2w_resetChip();
 	private_ts->s2w_timerdenied = 0;
   	return HRTIMER_NORESTART;
 }
@@ -1218,7 +1219,7 @@ void himax_s2w_power(struct work_struct *himax_s2w_power_work) {
 	msleep(100);
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 0);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
-	himax_s2w_resetChip();
+	
 	printk(KERN_INFO "[TS][S2W]%s: Turn it on", __func__);
 	himax_s2w_release();
 }
@@ -1991,6 +1992,7 @@ static int himax8526a_suspend(struct i2c_client *client, pm_message_t mesg)
 	msleep(30);
 	i2c_himax_write(ts->client, 0xD7, &data, 1, HIMAX_I2C_RETRY_TIMES);
 #ifdef HIMAX_S2W
+	himax_s2w_timerStart();	
 	}
 #endif
 
@@ -2078,6 +2080,7 @@ static int himax8526a_resume(struct i2c_client *client)
 	enable_irq(client->irq);
 #ifdef HIMAX_S2W
 	}
+	himax_s2w_timerStart();	
 #endif
 
 	return 0;
