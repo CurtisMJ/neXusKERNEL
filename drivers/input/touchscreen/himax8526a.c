@@ -1233,34 +1233,27 @@ void himax_s2w_func(int x) {
 		private_ts->s2w_touched = 1;
 		private_ts->s2w_x_pos = x;
 	} else {
-		if (abs(private_ts->s2w_x_pos - x) > 600)
+		if ((abs(private_ts->s2w_x_pos - x) > 600) && s2w_switch)
 		{
-			if (private_ts->suspend_mode == 1) {
+			if ((private_ts->suspend_mode == 1) || (s2l_switch == 0))  {
 				himax_s2w_power(&himax_s2w_power_work);	
 				himax_s2w_timerStart();	
 			}
-			else
-			{
-				if (s2l_switch == 1)
-				{
-					if ((private_ts->s2w_x_pos - x) > 600)
-					{
-						// toggle soft key lock
-						printk(KERN_INFO "[TS][S2W]%s: Soft key lock toggled", __func__);
-						if (private_ts->s2l_activated == 0)
-							private_ts->s2l_activated = 1;
-						else
-							private_ts->s2l_activated = 0; 
-						himax_s2w_timerStart();	 
-					}
-				}
-				else
-				{
-					himax_s2w_power(&himax_s2w_power_work);	
-					himax_s2w_timerStart();	
-				}	
-			}
 			himax_s2w_vibpat();
+		}
+		// the below code has been isolated to support s2l even when s2w is not enabled
+		if ((s2l_switch == 1) && (private_ts->suspend_mode == 0))
+		{
+			if ((private_ts->s2w_x_pos - x) > 600)
+			{
+				// toggle soft key lock
+				printk(KERN_INFO "[TS][S2W]%s: Soft key lock toggled", __func__);
+				if (private_ts->s2l_activated == 0)
+					private_ts->s2l_activated = 1;
+				else
+					private_ts->s2l_activated = 0; 
+				himax_s2w_timerStart();	 
+			}
 		}
 	}
 }
