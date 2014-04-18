@@ -1088,8 +1088,8 @@ void himax_s2w_release() {
 }
 
 void himax_s2w_timerInit() {
-	unsigned long delay_in_ms = 300L;	
-	unsigned long h2w_delay_in_ms = 800L;
+	unsigned long delay_in_ms = 500L;	
+	unsigned long h2w_delay_in_ms = 1000L;
 
 	printk(KERN_INFO "[TS][S2W]%s: Setting up timers\n", __func__);
   	hrtimer_init( &s2w_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL );
@@ -1297,12 +1297,10 @@ void himax_s2w_func(int x) {
 			himax_s2w_vibpat();
 		}
 		// the below code assumes s2w is not on
-		if ((h2w_switch == 1) && (private_ts->suspend_mode == 1) ){
-			if ((abs(xDiff) < 50) && (private_ts->h2w_active == 0)) {
-				private_ts->h2w_active = 1;
-				himax_h2w_timerStart();	 
-				printk(KERN_INFO "[TS][S2W]%s: H2W Initiated\n", __func__);
-			}
+		if ((h2w_switch == 1) && (private_ts->suspend_mode == 1) && (private_ts->h2w_active == 0)){
+			private_ts->h2w_active = 1;
+			himax_h2w_timerStart();	 
+			printk(KERN_INFO "[TS][S2W]%s: H2W Initiated\n", __func__);
 		}
 	}
 }
@@ -1567,7 +1565,7 @@ inline void himax_ts_work(struct himax_ts_data *ts)
 							himax_s2w_release();
 					}
 				}
-				if ((private_ts->s2l_activated == 0) || (y < ts->pdata->abs_y_max)) {
+				if (((private_ts->s2l_activated == 0) || (y < ts->pdata->abs_y_max)) && !(himax_s2w_enabled() && himax_s2w_status() && (y > ts->pdata->abs_y_max) && (abs(private_ts->s2w_x_pos - x) > 3))) {
 #endif
 
 				if (ts->event_htc_enable_type) {
