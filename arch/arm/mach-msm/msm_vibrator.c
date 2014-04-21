@@ -315,12 +315,6 @@ static ssize_t voltage_level_store(
 	return size;
 }
 
-int vibrate(int time)
-{
-    vibrator_enable(&pmic_vibrator, time);
-    return 0;
-}
-
 static DEVICE_ATTR(voltage_level, 0644, voltage_level_show, voltage_level_store);
 
 void __init msm_init_pmic_vibrator(int level)
@@ -346,6 +340,12 @@ void __init msm_init_pmic_vibrator(int level)
 #endif	
 	VIB_INFO_LOG("%s, init pmic vibrator!",__func__);
 	return;
+}
+
+int _vibrate(int time)
+{
+    vibrator_enable(&pmic_vibrator, time);
+    return 0;
 }
 
 MODULE_DESCRIPTION("timed output pmic vibrator device");

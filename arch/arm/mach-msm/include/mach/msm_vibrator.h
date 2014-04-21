@@ -1,1 +1,1 @@
-int vibrate(int);
+extern int _vibrate(int);
